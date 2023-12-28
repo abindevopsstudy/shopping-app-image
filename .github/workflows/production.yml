@@ -1,0 +1,51 @@
+---
+name: "Flipkart prod-app image build and deploy"
+
+
+on:
+  push:
+    branches:
+      - production
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      packer_version: "1.9.4"
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v3
+
+      - name: "Installing Packer"
+        uses: hashicorp/setup-packer@main
+        with:
+          version: ${{ env.packer_version }}
+
+      - name: "Packer init by setting up working directory"
+        run: packer init .
+        working-directory: ./packer/
+
+      - name: "Packer validate"
+        run: packer validate -var-file="prod.pkvars.hcl" .
+        working-directory: ./packer/
+
+      - name: "Format packer template"
+        run: packer fmt .
+        working-directory: ./packer/
+
+      - name: "Packer build"
+        run: packer build -var-file="prod.pkvars.hcl" .
+        working-directory: ./packer/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.PROD_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.PROD_SECRET_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.PROD_REGION }}
+
+      - name: "Notify Dev Deploy Job"
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.PAT }}
+          repository: abindevopsstudy/shopping-app-infra
+          event-type: prod-deploy-event
